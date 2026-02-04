@@ -1,201 +1,136 @@
-# set color theme
+# =========================
+# Cursor Free VIP Installer
+# Fork-safe & Future-proof
+# =========================
+
+# ---------- Theme ----------
 $Theme = @{
-    Primary   = 'Cyan'
-    Success   = 'Green'
-    Warning   = 'Yellow'
-    Error     = 'Red'
-    Info      = 'White'
+    Primary = 'Cyan'
+    Success = 'Green'
+    Warning = 'Yellow'
+    Error   = 'Red'
+    Info    = 'White'
 }
 
-# ASCII Logo
+# ---------- Logo ----------
 $Logo = @"
-   ██████╗██╗   ██╗██████╗ ███████╗ ██████╗ ██████╗      ██████╗ ██████╗  ██████╗   
-  ██╔════╝██║   ██║██╔══██╗██╔════╝██╔═══██╗██╔══██╗     ██╔══██╗██╔══██╗██╔═══██╗  
-  ██║     ██║   ██║██████╔╝███████╗██║   ██║██████╔╝     ██████╔╝██████╔╝██║   ██║  
-  ██║     ██║   ██║██╔══██╗╚════██║██║   ██║██╔══██╗     ██╔═══╝ ██╔══██╗██║   ██║  
-  ╚██████╗╚██████╔╝██║  ██║███████║╚██████╔╝██║  ██║     ██║     ██║  ██║╚██████╔╝  
-   ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝     ╚═╝     ╚═╝  ╚═╝ ╚═════╝  
+   ██████╗██╗   ██╗██████╗ ███████╗ ██████╗ ██████╗      ██████╗ ██████╗  ██████╗
+  ██╔════╝██║   ██║██╔══██╗██╔════╝██╔═══██╗██╔══██╗     ██╔══██╗██╔══██╗██╔═══██╗
+  ██║     ██║   ██║██████╔╝███████╗██║   ██║██████╔╝     ██████╔╝██████╔╝██║   ██║
+  ██║     ██║   ██║██╔══██╗╚════██║██║   ██║██╔══██╗     ██╔═══╝ ██╔══██╗██║   ██║
+  ╚██████╗╚██████╔╝██║  ██║███████║╚██████╔╝██║  ██║     ██║     ██║  ██║╚██████╔╝
+   ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝     ╚═╝     ╚═╝  ╚═╝ ╚═════╝
 "@
 
-# Beautiful Output Function
+# ---------- Styled Output ----------
 function Write-Styled {
-    param (
+    param(
         [string]$Message,
         [string]$Color = $Theme.Info,
-        [string]$Prefix = "",
-        [switch]$NoNewline
+        [string]$Prefix = ""
     )
-    $symbol = switch ($Color) {
+
+    $icon = switch ($Color) {
         $Theme.Success { "[OK]" }
         $Theme.Error   { "[X]" }
         $Theme.Warning { "[!]" }
         default        { "[*]" }
     }
-    
-    $output = if ($Prefix) { "$symbol $Prefix :: $Message" } else { "$symbol $Message" }
-    if ($NoNewline) {
-        Write-Host $output -ForegroundColor $Color -NoNewline
+
+    if ($Prefix) {
+        Write-Host "$icon $Prefix :: $Message" -ForegroundColor $Color
     } else {
-        Write-Host $output -ForegroundColor $Color
+        Write-Host "$icon $Message" -ForegroundColor $Color
     }
 }
 
-# Get version number function
-function Get-LatestVersion {
+# ---------- TLS ----------
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# ---------- GitHub Info ----------
+$RepoOwner = "Tegeney"
+$RepoName  = "cursor-free-vip"
+$ApiUrl    = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
+
+# ---------- Get Latest Release ----------
+function Get-LatestRelease {
     try {
-        $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/yeongpin/cursor-free-vip/releases/latest"
-        return @{
-            Version = $latestRelease.tag_name.TrimStart('v')
-            Assets = $latestRelease.assets
-        }
-    } catch {
-        Write-Styled $_.Exception.Message -Color $Theme.Error -Prefix "Error"
+        Invoke-RestMethod -Uri $ApiUrl -Headers @{ "User-Agent" = "PowerShell" }
+    }
+    catch {
+        Write-Styled "Failed to contact GitHub API" $Theme.Error "Error"
         throw "Cannot get latest version"
     }
 }
 
-# Show Logo
-Write-Host $Logo -ForegroundColor $Theme.Primary
-$releaseInfo = Get-LatestVersion
-$version = $releaseInfo.Version
-Write-Host "Version $version" -ForegroundColor $Theme.Info
-Write-Host "Created by YeongPin`n" -ForegroundColor $Theme.Info
-
-# Set TLS 1.2
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-# Main installation function
+# ---------- Main Installer ----------
 function Install-CursorFreeVIP {
-    Write-Styled "Start downloading Cursor Free VIP" -Color $Theme.Primary -Prefix "Download"
-    
-    try {
-        # Get latest version
-        Write-Styled "Checking latest version..." -Color $Theme.Primary -Prefix "Update"
-        $releaseInfo = Get-LatestVersion
-        $version = $releaseInfo.Version
-        Write-Styled "Found latest version: $version" -Color $Theme.Success -Prefix "Version"
-        
-        # Find corresponding resources
-        $asset = $releaseInfo.Assets | Where-Object { $_.name -eq "CursorFreeVIP_${version}_windows.exe" }
-        if (!$asset) {
-            Write-Styled "File not found: CursorFreeVIP_${version}_windows.exe" -Color $Theme.Error -Prefix "Error"
-            Write-Styled "Available files:" -Color $Theme.Warning -Prefix "Info"
-            $releaseInfo.Assets | ForEach-Object {
-                Write-Styled "- $($_.name)" -Color $Theme.Info
-            }
-            throw "Cannot find target file"
-        }
-        
-        # Check if Downloads folder already exists for the corresponding version
-        $DownloadsPath = [Environment]::GetFolderPath("UserProfile") + "\Downloads"
-        $downloadPath = Join-Path $DownloadsPath "CursorFreeVIP_${version}_windows.exe"
-        
-        if (Test-Path $downloadPath) {
-            Write-Styled "Found existing installation file" -Color $Theme.Success -Prefix "Found"
-            Write-Styled "Location: $downloadPath" -Color $Theme.Info -Prefix "Location"
-            
-            # Check if running with administrator privileges
-            $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-            
-            if (-not $isAdmin) {
-                Write-Styled "Requesting administrator privileges..." -Color $Theme.Warning -Prefix "Admin"
-                
-                # Create new process with administrator privileges
-                $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-                $startInfo.FileName = $downloadPath
-                $startInfo.UseShellExecute = $true
-                $startInfo.Verb = "runas"
-                
-                try {
-                    [System.Diagnostics.Process]::Start($startInfo)
-                    Write-Styled "Program started with admin privileges" -Color $Theme.Success -Prefix "Launch"
-                    return
-                }
-                catch {
-                    Write-Styled "Failed to start with admin privileges. Starting normally..." -Color $Theme.Warning -Prefix "Warning"
-                    Start-Process $downloadPath
-                    return
-                }
-            }
-            
-            # If already running with administrator privileges, start directly
-            Start-Process $downloadPath
-            return
-        }
-        
-        Write-Styled "No existing installation file found, starting download..." -Color $Theme.Primary -Prefix "Download"
 
-        # Use HttpWebRequest for chunked download with real-time progress bar
-        $url = $asset.browser_download_url
-        $outputFile = $downloadPath
-        Write-Styled "Downloading from: $url" -Color $Theme.Info -Prefix "URL"
-        Write-Styled "Saving to: $outputFile" -Color $Theme.Info -Prefix "Path"
+    Write-Styled "Checking latest release..." $Theme.Primary "Update"
+    $release = Get-LatestRelease
 
-        $request = [System.Net.HttpWebRequest]::Create($url)
-        $request.UserAgent = "PowerShell Script"
-        $response = $request.GetResponse()
-        $totalLength = $response.ContentLength
-        $responseStream = $response.GetResponseStream()
-        $fileStream = [System.IO.File]::OpenWrite($outputFile)
-        $buffer = New-Object byte[] 8192
-        $bytesRead = 0
-        $totalRead = 0
-        $lastProgress = -1
-        $startTime = Get-Date
-        try {
-            do {
-                $bytesRead = $responseStream.Read($buffer, 0, $buffer.Length)
-                if ($bytesRead -gt 0) {
-                    $fileStream.Write($buffer, 0, $bytesRead)
-                    $totalRead += $bytesRead
-                    $progress = [math]::Round(($totalRead / $totalLength) * 100, 1)
-                    if ($progress -ne $lastProgress) {
-                        $elapsed = (Get-Date) - $startTime
-                        $speed = if ($elapsed.TotalSeconds -gt 0) { $totalRead / $elapsed.TotalSeconds } else { 0 }
-                        $speedDisplay = if ($speed -gt 1MB) {
-                            "{0:N2} MB/s" -f ($speed / 1MB)
-                        } elseif ($speed -gt 1KB) {
-                            "{0:N2} KB/s" -f ($speed / 1KB)
-                        } else {
-                            "{0:N2} B/s" -f $speed
-                        }
-                        $downloadedMB = [math]::Round($totalRead / 1MB, 2)
-                        $totalMB = [math]::Round($totalLength / 1MB, 2)
-                        Write-Progress -Activity "Downloading CursorFreeVIP" -Status "$downloadedMB MB / $totalMB MB ($progress%) - $speedDisplay" -PercentComplete $progress
-                        $lastProgress = $progress
-                    }
-                }
-            } while ($bytesRead -gt 0)
-        } finally {
-            $fileStream.Close()
-            $responseStream.Close()
-            $response.Close()
-        }
-        Write-Progress -Activity "Downloading CursorFreeVIP" -Completed
-        # Check file exists and is not zero size
-        if (!(Test-Path $outputFile) -or ((Get-Item $outputFile).Length -eq 0)) {
-            throw "Download failed or file is empty."
-        }
-        Write-Styled "Download completed!" -Color $Theme.Success -Prefix "Complete"
-        Write-Styled "File location: $outputFile" -Color $Theme.Info -Prefix "Location"
-        Write-Styled "Starting program..." -Color $Theme.Primary -Prefix "Launch"
-        Start-Process $outputFile
+    $version = $release.tag_name
+    Write-Styled "Latest version: $version" $Theme.Success "Version"
+
+    # Find Windows EXE (version-agnostic)
+    $asset = $release.assets | Where-Object {
+        $_.name -match "_windows\.exe$"
+    } | Select-Object -First 1
+
+    if (-not $asset) {
+        Write-Styled "No Windows executable found in release assets" $Theme.Error "Error"
+        throw "Missing executable"
     }
-    catch {
-        Write-Styled $_.Exception.Message -Color $Theme.Error -Prefix "Error"
-        throw
+
+    Write-Styled "Found asset: $($asset.name)" $Theme.Success "Asset"
+
+    $Downloads = Join-Path $env:USERPROFILE "Downloads"
+    $ExePath  = Join-Path $Downloads $asset.name
+
+    # Download if not exists
+    if (-not (Test-Path $ExePath)) {
+
+        Write-Styled "Downloading..." $Theme.Primary "Download"
+        Write-Styled $asset.browser_download_url $Theme.Info "URL"
+
+        Invoke-WebRequest `
+            -Uri $asset.browser_download_url `
+            -OutFile $ExePath `
+            -UseBasicParsing `
+            -Headers @{ "User-Agent" = "PowerShell" }
+
+        Write-Styled "Download completed" $Theme.Success "Done"
+    }
+    else {
+        Write-Styled "File already exists" $Theme.Warning "Skip"
+    }
+
+    # Run as admin if needed
+    $isAdmin = ([Security.Principal.WindowsPrincipal] `
+        [Security.Principal.WindowsIdentity]::GetCurrent()
+    ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+    if (-not $isAdmin) {
+        Write-Styled "Requesting administrator privileges..." $Theme.Warning "Admin"
+        Start-Process $ExePath -Verb RunAs
+    }
+    else {
+        Write-Styled "Launching application..." $Theme.Primary "Run"
+        Start-Process $ExePath
     }
 }
 
-# Execute installation
+# ---------- Start ----------
+Clear-Host
+Write-Host $Logo -ForegroundColor $Theme.Primary
+Write-Host "Created by YeongPin (Fork maintained by Tegeney)`n" -ForegroundColor $Theme.Info
+
 try {
     Install-CursorFreeVIP
 }
 catch {
-    Write-Styled "Download failed" -Color $Theme.Error -Prefix "Error"
-    Write-Styled $_.Exception.Message -Color $Theme.Error
+    Write-Styled $_ $Theme.Error "Fatal"
 }
-finally {
-    Write-Host "`nPress any key to exit..." -ForegroundColor $Theme.Info
-    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-}
+
+Write-Host "`nPress any key to exit..." -ForegroundColor $Theme.Info
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
